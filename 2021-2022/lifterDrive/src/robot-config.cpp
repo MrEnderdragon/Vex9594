@@ -16,6 +16,7 @@ motor DriveFR = motor(PORT4, ratio18_1, true);
 motor midL = motor(PORT6, ratio36_1, false);
 motor midR = motor(PORT7, ratio36_1, true);
 motor backArm = motor(PORT9, ratio36_1, true);
+limit smallSwitch = limit(Brain.ThreeWirePort.A);
 
 // VEXcode generated functions
 // define variable for remote controller enable/disable

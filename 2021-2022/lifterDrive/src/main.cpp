@@ -18,6 +18,7 @@
 // midL                 motor         6               
 // midR                 motor         7               
 // backArm              motor         9               
+// smallSwitch          limit         A               
 // ---- END VEXCODE CONFIGURED DEVICES ----
 
 #include "vex.h"
@@ -63,7 +64,7 @@ bool blinked = false; //whether is blinking
 bool opened = false; //whether is meowing
 
 bool slowmode = false;
-bool revmode = false;
+bool revmode = true;
 bool convMode = false;
 bool aPressed = false;
 bool bPressed = false;
@@ -100,6 +101,68 @@ void turnDegsCW(int speed, int degs){
   DriveBR.spinFor(-degs*wheelDegPerTurnDeg, deg, speed, rpm);
 }
 
+void driveTime (int speed, double amTime){
+
+  amTime *= 1000;
+
+  int start = vex::timer::system();
+
+  DriveBL.spin(forward, speed, rpm);
+  DriveBR.spin(forward, speed, rpm);
+  DriveFL.spin(forward, speed, rpm);
+  DriveFR.spin(forward, speed, rpm);
+
+  while(vex::timer::system() - start <= amTime){
+    vex::task::sleep(moveAcc);
+  }
+
+  DriveFL.stop();
+  DriveFR.stop();
+  DriveBL.stop();
+  DriveBR.stop();
+}
+
+void driveTime2 (int speedL, int speedR, double amTime){
+
+  amTime *= 1000;
+
+  int start = vex::timer::system();
+
+  DriveBL.spin(forward, speedL, rpm);
+  DriveBR.spin(forward, speedR, rpm);
+  DriveFL.spin(forward, speedL, rpm);
+  DriveFR.spin(forward, speedR, rpm);
+
+  while(vex::timer::system() - start <= amTime){
+    vex::task::sleep(moveAcc);
+  }
+
+  DriveFL.stop();
+  DriveFR.stop();
+  DriveBL.stop();
+  DriveBR.stop();
+}
+
+void turnTime (int speed, double amTime){
+
+  amTime *= 1000;
+
+  int start = vex::timer::system();
+
+  DriveBL.spin(forward, speed, rpm);
+  DriveBR.spin(forward, -speed, rpm);
+  DriveFL.spin(forward, speed, rpm);
+  DriveFR.spin(forward, -speed, rpm);
+
+  while(vex::timer::system() - start <= amTime){
+    vex::task::sleep(moveAcc);
+  }
+
+  DriveFL.stop();
+  DriveFR.stop();
+  DriveBL.stop();
+  DriveBR.stop();
+}
 
 int controlAxis (int axis){
   switch(axis){
@@ -270,27 +333,6 @@ void drawFace (const char * bg, const char * linee) {
   }
 }
 
-void driveTime (int speed, double amTime){
-
-  amTime *= 1000;
-
-  int start = vex::timer::system();
-
-  DriveBL.spin(forward, speed, rpm);
-  DriveBR.spin(forward, speed, rpm);
-  DriveFL.spin(forward, speed, rpm);
-  DriveFR.spin(forward, speed, rpm);
-
-  while(vex::timer::system() - start <= amTime){
-    vex::task::sleep(moveAcc);
-  }
-
-  DriveFL.stop();
-  DriveFR.stop();
-  DriveBL.stop();
-  DriveBR.stop();
-}
-
 void drive(int speed1, int speed2){
   float res1 = fmax(fmin(speed1, 100),-100);
   float res2 = fmax(fmin(speed2, 100),-100);
@@ -378,8 +420,13 @@ void driveLoop () {
   // }
 
   if(controlButton('r', true)){
-    midL.spin(forward,50,rpm);
-    midR.spin(forward,50,rpm);
+    if(!smallSwitch.pressing()){
+      midL.spin(forward,50,rpm);
+      midR.spin(forward,50,rpm);
+    }else {
+      midL.stop();
+      midR.stop();
+    }
   }else if(controlButton('r', false)){
     midL.spin(reverse,50,rpm);
     midR.spin(reverse,50,rpm);
@@ -446,19 +493,27 @@ void driveLoop () {
 void expand () {
   // midL.spinFor(reverse, 4*90, degrees, 100, rpm, false);
   // midR.spinFor(reverse, 4*90, degrees, 100, rpm, false);
-  backArm.spinFor(reverse, 7*(110+150), degrees, 100, rpm);
+  backArm.spinFor(reverse, 7*(110+160), degrees, 50, rpm);
 }
 
 void skillAutonomous() {
   expand();
 
-  driveTime(-100, 2.5);
+  //driveTime(-100, 2.0);
+  driveTime(-50, 2.0);
 
   // midL.spinFor(forward, 4*70, degrees, 100, rpm, false);
   // midR.spinFor(forward, 4*70, degrees, 100, rpm, false);
-  backArm.spinFor(forward, 7*(60), degrees, 100, rpm);
+  backArm.spinFor(forward, 7*(40), degrees, 100, rpm, false);
 
-  driveTime(200, 1.7);
+  driveTime(-10, 0.3);
+
+  driveTime(0, 1);
+
+  driveTime(-10, 0.3);
+
+  //driveTime(100, 0.7);
+  driveTime2(100, 0, 3.5);
 }
 
 void driveAutonomous() {

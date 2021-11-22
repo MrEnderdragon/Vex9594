@@ -11,6 +11,7 @@ extern motor DriveFR;
 extern motor midL;
 extern motor midR;
 extern motor backArm;
+extern limit smallSwitch;
 
 /**
  * Used to initialize code/tasks/devices added using tools in VEXcode Pro.
