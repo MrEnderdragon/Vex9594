@@ -19,6 +19,9 @@
 // midR                 motor         7               
 // backArm              motor         9               
 // smallSwitch          limit         A               
+// grabber              motor         11              
+// leftSwitch           limit         G               
+// rightSwitch          limit         H               
 // ---- END VEXCODE CONFIGURED DEVICES ----
 
 #include "vex.h"
@@ -333,24 +336,34 @@ void drawFace (const char * bg, const char * linee) {
   }
 }
 
-void drive(int speed1, int speed2){
+void drive(int speed1, int speed2, int speed3, int speed4){
   float res1 = fmax(fmin(speed1, 100),-100);
   float res2 = fmax(fmin(speed2, 100),-100);
+  float res3 = fmax(fmin(speed3, 100),-100);
+  float res4 = fmax(fmin(speed4, 100),-100);
 
   if(speed1 == 0) {
     stopDrive(1);
-    stopDrive(3);
   }else {
     DriveBL.spin(forward,res1 * multiplier,rpm);
-    DriveFL.spin(forward,res1 * multiplier,rpm);
   }
-  
+
   if(speed2 == 0) {
     stopDrive(2);
-    stopDrive(4);
   }else {
     DriveBR.spin(forward,res2 * multiplier,rpm);
-    DriveFR.spin(forward,res2 * multiplier,rpm);
+  }
+
+  if(speed3 == 0) {
+    stopDrive(3);
+  }else {
+    DriveFL.spin(forward,res3 * multiplier,rpm);
+  }
+
+  if(speed4 == 0) {
+    stopDrive(4);
+  }else {
+    DriveFR.spin(forward,res4 * multiplier,rpm);
   }
 }
 
@@ -370,7 +383,8 @@ void initialize () {
   midL.setBrake(brake);
   midR.setBrake(brake);
 
-  backArm.setBrake(brake);
+  grabber.setBrake(hold);
+  backArm.setBrake(hold);
 
   Brain.Screen.setPenColor("#FFFFFF");
   Brain.Screen.drawRectangle(0, 0, 500, 500, "#000000");
@@ -393,21 +407,32 @@ void initialize () {
 
 void driveLoop () {
 
-  int driveAms[] = {0,0};
+  int driveAms[] = {0,0,0,0};
 
   // ---- DRIVING ----
 
   if(controlAxis(3) > driveThreshold || controlAxis(3) < -driveThreshold){
     driveAms[0] += controlAxis(3)*revAm;
     driveAms[1] += controlAxis(3)*revAm;
+    driveAms[2] += controlAxis(3)*revAm;
+    driveAms[3] += controlAxis(3)*revAm;
+  }
+
+  if(controlAxis(4) > driveThreshold || controlAxis(4) < -driveThreshold){
+    driveAms[0] -= controlAxis(4)*revAm;
+    driveAms[1] += controlAxis(4)*revAm;
+    driveAms[2] += controlAxis(4)*revAm;
+    driveAms[3] -= controlAxis(4)*revAm;
   }
 
   if(controlAxis(1) > turnThreshold || controlAxis(1) < -turnThreshold){
     driveAms[0] += controlAxis(1);
     driveAms[1] -= controlAxis(1);
+    driveAms[2] += controlAxis(1);
+    driveAms[3] -= controlAxis(1);
   }
 
-  drive(driveAms[0],driveAms[1]);
+  drive(driveAms[0],driveAms[1],driveAms[2],driveAms[3]);
 
   // if(controlAxis(2) > driveThreshold || controlAxis(2) < -driveThreshold){
   //   convAms[0] += controlAxis(2);
@@ -419,36 +444,62 @@ void driveLoop () {
   //   convAms[1] -= controlAxis(1);
   // }
 
-  if(controlButton('r', true)){
-    if(!smallSwitch.pressing()){
-      midL.spin(forward,50,rpm);
-      midR.spin(forward,50,rpm);
-    }else {
-      midL.stop();
-      midR.stop();
-    }
-  }else if(controlButton('r', false)){
-    midL.spin(reverse,50,rpm);
-    midR.spin(reverse,50,rpm);
+  int speedL = 0;
+  int speedR = 0;
+
+  if(controlButton('l', true)){
+    speedL = 50;
+    speedR = 50;
+  }else if(controlButton('l', false)){
+    speedL = -50;
+    speedR = -50;
+  }
+
+  if(controlButton('U')){
+    midL.spin(forward,100,rpm);
+    midR.spin(forward,100,rpm);
+    speedL = 100;
+    speedR = 100;
+  }else if (controlButton('D')){
+    midL.spin(reverse,100,rpm);
+    midR.spin(reverse,100,rpm);
+    speedL = -100;
+    speedR = -100;
   }else {
     midL.stop();
     midR.stop();
   }
 
-  if(controlButton('l', true)){
-    backArm.spin(forward,50,rpm);
-  }else if(controlButton('l', false)){
-    backArm.spin(reverse,50,rpm);
+  if(!leftSwitch.pressing() && speedL != 0){
+    midL.spin(forward,speedL,rpm);
   }else {
+    midL.stop();
+  }
 
-    if(controlButton('U', false)){
-      backArm.spin(forward,100,rpm);
-    }else if(controlButton('D', false)){
-      backArm.spin(reverse,100,rpm);
+  if(!rightSwitch.pressing() && speedR != 0){
+    midR.spin(forward,speedR,rpm);
+  }else {
+    midR.stop();
+  }
+
+  if(controlButton('r', true)){
+    if(!smallSwitch.pressing()){
+      backArm.spin(forward,50,rpm);
     }else {
       backArm.stop();
     }
-    
+  }else if(controlButton('r', false)){
+    backArm.spin(reverse,100,rpm);
+  }else {
+    backArm.stop();
+  }
+
+  if(controlButton('R')){
+    grabber.spin(forward,100,rpm);
+  }else if(controlButton('L')){
+    grabber.spin(reverse,100,rpm);
+  }else {
+    grabber.stop();
   }
 
   // ---- REVMODE ----  
