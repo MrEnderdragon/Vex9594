@@ -19,9 +19,11 @@
 // midR                 motor         7               
 // backArm              motor         9               
 // smallSwitch          limit         A               
-// grabber              motor         11              
-// leftSwitch           limit         G               
-// rightSwitch          limit         H               
+// grabber              motor         13              
+// leftSwitch           limit         H               
+// rightSwitch          limit         G               
+// leftEnc              encoder       C, D            
+// rightEnc             encoder       E, F            
 // ---- END VEXCODE CONFIGURED DEVICES ----
 
 #include "vex.h"
@@ -47,7 +49,8 @@ int turnThreshold = 10;
 double moveStuckThresh = 0.01; // in degrees
 double moveStuckReps = 50;
 int moveAcc = 5; // in millisecs per rep
-int revTime = 300;
+
+float decelCoeff = 1;
 
 float slowMult = 0.8;
 float normMult = 1.9;
@@ -56,6 +59,9 @@ int revAm = 1;
 
 double wheelDiam = 2.5; //inches
 double chassisWidth = 18.5; //inches
+
+double trackDiam = 3.26; //inches
+double trackWidth = 18.5; //inches
 
 int abortTime = 10000;
 
@@ -84,11 +90,20 @@ int revCounter = 0;
 double wheelCirc = wheelDiam * mPi;
 double distPerWheelDeg =  wheelCirc / 360;
 
+double trackCirc = trackDiam * mPi;
+double distPerTrackDeg =  trackCirc / 360;
+
 // ---- TURN DRIVE MATH ----
 
 double turnCirc = chassisWidth * mPi;
 double distPerTurnDeg = turnCirc / 360;
 double wheelDegPerTurnDeg = distPerTurnDeg/distPerWheelDeg-1;
+
+double trackTurnCirc = trackWidth * mPi;
+double distPerTrackTurnDeg = trackTurnCirc / 360;
+double trackDegPerTurnDeg = distPerTrackTurnDeg/distPerTrackDeg-1;
+
+// ---- AUTON ----
 
 void driveDist(int speed, int dist){
   DriveFL.spinFor(dist/distPerWheelDeg, deg,speed, rpm, false);
@@ -97,12 +112,105 @@ void driveDist(int speed, int dist){
   DriveBR.spinFor(dist/distPerWheelDeg, deg,speed, rpm);
 }
 
+void distTrack (double dist, int speed, double accelPerc = 10, double decellPerc=80){
+  leftEnc.resetRotation();
+  rightEnc.resetRotation();
+
+  double distDegs = dist/distPerTrackDeg;
+  decellPerc /= 100;
+
+  while(true){
+    double speed1 = speed * (dist<0?-1:1);
+    double speed2 = speed * (dist<0?-1:1);
+
+    double posL = leftEnc.position(deg);
+    double posR = rightEnc.position(deg);
+
+    if(fabs(posL) > fabs(distDegs*decellPerc)){
+      speed1 *= (distDegs-posL) / (distDegs*(1-decellPerc)) * decelCoeff;
+    }else if (fabs(posL) < fabs(distDegs*accelPerc)){
+      speed1 *= (distDegs-posL) / (distDegs*decellPerc) * decelCoeff;
+    }
+
+    if(fabs(posR) > fabs(distDegs*decellPerc)){
+      speed2 *= (distDegs-posR) / (distDegs*(1-decellPerc)) * decelCoeff;
+    }else if (fabs(posR) < fabs(distDegs*accelPerc)){
+      speed2 *= (distDegs-posR) / (distDegs*decellPerc) * decelCoeff;
+    }
+
+    if(fabs(speed1) < 10) {
+      DriveFL.stop();
+      DriveBL.stop();
+    }else {
+      DriveFL.spin(forward, speed1, rpm);
+      DriveBL.spin(forward, speed1, rpm);
+    }
+
+    if(fabs(speed2) < 10) {
+      DriveFR.stop();
+      DriveBR.stop();
+    }else {
+      DriveFR.spin(forward, speed2, rpm);
+      DriveBR.spin(forward, speed2, rpm);
+    }
+
+    if(fabs(speed1) < 10 && fabs(speed2) < 10) break;
+
+    vex::task::sleep(moveAcc);
+  }
+}
+
 void turnDegsCW(int speed, int degs){
   DriveFL.spinFor(degs*wheelDegPerTurnDeg, deg, speed, rpm, false);
   DriveBL.spinFor(degs*wheelDegPerTurnDeg, deg, speed, rpm, false);
   DriveFR.spinFor(-degs*wheelDegPerTurnDeg, deg, speed, rpm, false);
   DriveBR.spinFor(-degs*wheelDegPerTurnDeg, deg, speed, rpm);
 }
+
+void turnTrackCW (double degs, int speed, double decellPerc=80){
+  leftEnc.resetRotation();
+  rightEnc.resetRotation();
+
+  double distDegs = degs*trackDegPerTurnDeg;
+  decellPerc /= 100;
+
+  while(true){
+    double speed1 = speed * (degs<0?-1:1);
+    double speed2 = speed * (degs<0?-1:1);
+
+    double posL = leftEnc.position(deg);
+    double posR = -rightEnc.position(deg);
+
+    if(fabs(posL) > fabs(distDegs*decellPerc)){
+      speed1 *= (distDegs-posL) / (distDegs*(1-decellPerc)) * decelCoeff;
+    }
+
+    if(fabs(posR) > fabs(distDegs*decellPerc)){
+      speed2 *= (-distDegs-posR) / (-distDegs*(1-decellPerc)) * decelCoeff;
+    }
+
+    if(fabs(speed1) < 10) {
+      DriveFL.stop();
+      DriveBL.stop();
+    }else {
+      DriveFL.spin(forward, speed1, rpm);
+      DriveBL.spin(forward, speed1, rpm);
+    }
+
+    if(fabs(speed2) < 10) {
+      DriveFR.stop();
+      DriveBR.stop();
+    }else {
+      DriveFR.spin(reverse, speed2, rpm);
+      DriveBR.spin(reverse, speed2, rpm);
+    }
+
+    if(fabs(speed1) < 10 && fabs(speed2) < 10) break;
+
+    vex::task::sleep(moveAcc);
+  }
+}
+
 
 void driveTime (int speed, double amTime){
 
@@ -380,8 +488,8 @@ void initialize () {
   DriveBL.setBrake(brake);
   DriveBR.setBrake(brake);
 
-  midL.setBrake(brake);
-  midR.setBrake(brake);
+  midL.setBrake(hold);
+  midR.setBrake(hold);
 
   grabber.setBrake(hold);
   backArm.setBrake(hold);
@@ -434,49 +542,32 @@ void driveLoop () {
 
   drive(driveAms[0],driveAms[1],driveAms[2],driveAms[3]);
 
-  // if(controlAxis(2) > driveThreshold || controlAxis(2) < -driveThreshold){
-  //   convAms[0] += controlAxis(2);
-  //   convAms[1] += controlAxis(2);
-  // }
-
-  // if(controlAxis(1) > turnThreshold || controlAxis(1) < -turnThreshold){
-  //   convAms[0] += controlAxis(1);
-  //   convAms[1] -= controlAxis(1);
-  // }
-
   int speedL = 0;
   int speedR = 0;
 
   if(controlButton('l', true)){
+    speedL = 100;
+    speedR = 100;
+  }else if(controlButton('l', false)){
+    speedL = -100;
+    speedR = -100;
+  }
+
+  if(controlButton('U')){
     speedL = 50;
     speedR = 50;
-  }else if(controlButton('l', false)){
+  }else if (controlButton('D')){
     speedL = -50;
     speedR = -50;
   }
 
-  if(controlButton('U')){
-    midL.spin(forward,100,rpm);
-    midR.spin(forward,100,rpm);
-    speedL = 100;
-    speedR = 100;
-  }else if (controlButton('D')){
-    midL.spin(reverse,100,rpm);
-    midR.spin(reverse,100,rpm);
-    speedL = -100;
-    speedR = -100;
-  }else {
-    midL.stop();
-    midR.stop();
-  }
-
-  if(!leftSwitch.pressing() && speedL != 0){
+  if((!leftSwitch.pressing() && speedL != 0) || speedL > 0){
     midL.spin(forward,speedL,rpm);
   }else {
     midL.stop();
   }
 
-  if(!rightSwitch.pressing() && speedR != 0){
+  if((!rightSwitch.pressing() && speedR != 0) || speedR > 0){
     midR.spin(forward,speedR,rpm);
   }else {
     midR.stop();
@@ -544,7 +635,7 @@ void driveLoop () {
 void expand () {
   // midL.spinFor(reverse, 4*90, degrees, 100, rpm, false);
   // midR.spinFor(reverse, 4*90, degrees, 100, rpm, false);
-  backArm.spinFor(reverse, 7*(110+160), degrees, 50, rpm);
+  // backArm.spinFor(reverse, 7*(110+160), degrees, 50, rpm);
 }
 
 void skillAutonomous() {
@@ -569,6 +660,9 @@ void skillAutonomous() {
 
 void driveAutonomous() {
   expand();
+
+  distTrack(tile, 150, 20, 80);
+  // distTrack(-tile, 150, 50);
 }
 
 int main() {
@@ -577,7 +671,7 @@ int main() {
   vexcodeInit();
 
   // Set up callbacks for autonomous and driver control periods.
-  Competition.autonomous(skillAutonomous);
+  Competition.autonomous(driveAutonomous);
   Competition.drivercontrol(driveLoop);
 
   // Run the pre-autonomous function.

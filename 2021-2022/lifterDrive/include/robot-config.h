@@ -15,6 +15,8 @@ extern limit smallSwitch;
 extern motor grabber;
 extern limit leftSwitch;
 extern limit rightSwitch;
+extern encoder leftEnc;
+extern encoder rightEnc;
 
 /**
  * Used to initialize code/tasks/devices added using tools in VEXcode Pro.
