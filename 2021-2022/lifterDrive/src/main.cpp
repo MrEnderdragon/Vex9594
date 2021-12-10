@@ -27,7 +27,8 @@
 // ---- END VEXCODE CONFIGURED DEVICES ----
 
 #include "vex.h"
-#include <cmath>
+// #include <cmath>
+#include <math.h>
 
 struct asyncParams {
   int timeDelay;
@@ -116,6 +117,13 @@ void driveDist(int speed, int dist){
   DriveBR.spinFor(dist/distPerWheelDeg, deg,speed, rpm);
 }
 
+double fabs(double inn){
+  if(inn < 0) {
+    return -inn;
+  }
+  return inn;
+}
+
 void distTrack (double dist, int speed, double accellPerc = 10, double decellPerc=80){
   leftEnc.resetRotation();
   rightEnc.resetRotation();
@@ -139,24 +147,29 @@ void distTrack (double dist, int speed, double accellPerc = 10, double decellPer
     double speedAcc = speed1;
 
     if(percentL > decellPerc){
-      speedAcc = speed1 * scale(decellPerc, 1, 1, 0, percentL);
+      speedAcc = fabs(speed1 * scale(decellPerc, 1, 1, 0, percentL)) * (distDegs>0?1:-1);
     }else if (percentL < accellPerc){
-      speedAcc = speed1 * scale(0, accellPerc, 0, 1, percentL);
+      speedAcc = fabs(speed1 * scale(0, accellPerc, 0, 1, percentL)) * (distDegs>0?1:-1);
     }
 
-    double comp = 20 * (posL < distDegs?1:-1);
-    speed1 = fabs(comp) > fabs(speedAcc)?comp:speedAcc;
+    double comp = 20 * ((posL < distDegs)?1:-1);
 
+      speed1 = (fabs(comp) > fabs(speedAcc))?comp:speedAcc;
+    
     speedAcc = speed2;
 
     if(percentR > decellPerc){
-      speedAcc = speed2 * scale(decellPerc, 1, 1, 0, percentR);
+      speedAcc = fabs(speed2 * scale(decellPerc, 1, 1, 0, percentR)) * (distDegs>0?1:-1);
     }else if (percentR < accellPerc){
-      speedAcc = speed2 * scale(0, accellPerc, 0, 1, percentR);
+      speedAcc = fabs(speed2 * scale(0, accellPerc, 0, 1, percentR)) * (distDegs>0?1:-1);
     }
 
-    comp = 20 * (posR < distDegs?1:-1);
-    speed2 = fabs(comp) > fabs(speedAcc)?comp:speedAcc;
+    comp = 20 * ((posR < distDegs)?1:-1);
+    // if(distDegs > 0){
+      speed2 = (fabs(comp) > fabs(speedAcc))?comp:speedAcc;
+    // }else {
+    //   speed2 = (fabs(comp) < fabs(speedAcc))?comp:speedAcc;
+    // }
 
     DriveFL.spin(forward, speed1, rpm);
     DriveBL.spin(forward, speed1, rpm);
@@ -687,7 +700,7 @@ void expand () {
   // backArm.spinFor(reverse, 7*(110+160), degrees, 50, rpm);
 }
 
-void skillAutonomous() {
+void timeAuto() {
   expand();
 
   //driveTime(-100, 2.0);
@@ -709,14 +722,22 @@ void skillAutonomous() {
   driveTime2(0, -100, 2);
 }
 
-void driveAutonomous() {
+void trackAuto() {
   expand();
 
-  distTrack(tile, 150, 20, 80);
-  driveTime(0, 1);
-  turnTrackCW(90, 150, 10, 90);
-  // driveTime(0, 1);
-  // turnTrackCW(90, 150, 20, 80);
+  distTrack(2*tile, 150, 10, 90);
+  // backArm.spinFor(forward, 7*(35), degrees, 100, rpm, false);
+
+  distTrack(-2*tile, 150, 0, 100);
+  // turnTrackCW(180, 150, 10, 90);
+
+  // backArm.spinFor(reverse, 7*(35), degrees, 100, rpm, false);
+  
+  // turnTrackCW(-90, 150, 10, 90);
+  // distTrack(tile/2, 150, 10, 90);
+  // backArm.spinFor(forward, 7*(40), degrees, 100, rpm, false);
+
+  // distTrack(-tile, 150, 10, 90);
 }
 
 int main() {
@@ -725,7 +746,7 @@ int main() {
   vexcodeInit();
 
   // Set up callbacks for autonomous and driver control periods.
-  Competition.autonomous(skillAutonomous);
+  Competition.autonomous(trackAuto);
   Competition.drivercontrol(driveLoop);
 
   // Run the pre-autonomous function.
